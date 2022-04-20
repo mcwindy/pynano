@@ -2,67 +2,14 @@ import os
 import sys
 from msvcrt import getch
 
-debug = False
+debug = True
 tab_equivalent_length = 4
 
 cursor = [0, 0]
 modified = False
 show_save_menu = False
 terminal_size = os.get_terminal_size()
-
-
-def save_file(filename, content):
-    with open(filename, 'w') as f:
-        f.write(''.join(content))
-
-
-def show_screen(content):
-    global show_save_menu, cursor
-    os.system('cls')
-    print('\tpynano v0.1')
-    print('-' * terminal_size.columns, end='')
-    for i, line in enumerate(content):
-        for j, char in enumerate(line):
-            if [i, j] == cursor:
-                print('\033[4;30;47m{}\033[0m{}'.format(*((' \n', '') if char == '\n' else (' ', ' ' * (tab_equivalent_length - 1)) if char == '\t' else (char,
-                                                                                                                                                          ''))),
-                      end='')
-            else:
-                print(' ' * tab_equivalent_length if char == '\t' else char, end='')
-    print('~\n' * (terminal_size.lines - len(content) - 6 - debug * (1 + len(content))))
-
-    # print(terminal_size.lines - len(content) - 2 * int(show_save_menu) - 4)
-    if show_save_menu:
-        print('Save change? (Y/N) | C-c to cancel')
-        while True:
-            key = getch()
-            if key == b'\x03':
-                show_save_menu = False
-                return
-            elif key == b'Y' or key == b'y':
-                show_save_menu = False
-                # show_save_title = True
-                filename = get_filename()
-                save_file(filename, content)
-                my_exit()
-            elif key == b'N' or key == b'n':
-                # TODO save file to tmp
-                my_exit()
-    else:
-        print('C-x to save | C-c to exit')
-    if debug:
-        print(cursor)
-        print(content)
-
-
-def get_filename():
-    return target_path
-
-
-def my_exit():
-    os.system('cls')
-    exit(0)
-
+encoding = 'utf-8'
 
 # snippets from stackoverflow, like fine art in the trash
 
@@ -184,6 +131,192 @@ def is_path_exists_or_creatable_portable(pathname: str) -> bool:
         return False
 
 
+def save_file(filename, content):
+    content[-1] = content[-1][:-1]  # remove EOF symbol
+    with open(filename, 'w') as f:
+        f.write(''.join(content))
+
+
+def show_screen(content):
+    global show_save_menu, cursor
+    os.system('cls')
+    print('\tpynano v0.1')
+    print('-' * terminal_size.columns, end='')
+    for i, line in enumerate(content):
+        for j, char in enumerate(line):
+            if [i, j] == cursor:
+                print('\033[4;30;47m{}\033[0m{}'.format(
+                    *((' \n', '') if char == '\n' else (' ', ' ' * (tab_equivalent_length - 1)) if char == '\t' else (' ', '') if char == '\x00' else (char,
+                                                                                                                                                       ''))),
+                      end='')
+            else:
+                print(' ' * tab_equivalent_length if char == '\t' else ' ' if char == '\x00' else char, end='')
+    print('\n~' * (terminal_size.lines - len(content) - 6 - debug * (1 + len(content))))
+
+    # print(terminal_size.lines - len(content) - 2 * int(show_save_menu) - 4)
+    if show_save_menu:
+        print('Save change? (Y/N) | C-c to cancel')
+        while True:
+            key = getch()
+            if key == b'\x03':
+                show_save_menu = False
+                show_screen(content)
+                return
+            elif key == b'Y' or key == b'y':
+                show_save_menu = False
+                # show_save_title = True
+                filename = get_filename()
+                save_file(filename, content)
+                my_exit()
+            elif key == b'N' or key == b'n':
+                # TODO save file to tmp
+                my_exit()
+    else:
+        print('C-x to save | C-c to exit')
+    if debug:
+        print(cursor)
+        print(content)
+
+
+def get_filename():
+    return target_path
+
+
+def cursor_left(content, cursor):
+    if cursor[1] == 0:
+        if cursor[0] != 0:
+            cursor[0] = max(0, cursor[0] - 1)
+            cursor[1] = len(content[cursor[0]]) - 1
+    else:
+        cursor[1] -= 1
+    return content, cursor
+
+
+def cursor_right(content, cursor):
+    if cursor[1] == len(current_line) - 1:
+        if cursor[0] != len(content) - 1:
+            cursor[0] = min(len(content) - 1, cursor[0] + 1)
+            cursor[1] = 0
+    else:
+        cursor[1] += 1
+    return content, cursor
+
+
+def cursor_up(content, cursor):
+    cursor[0] = max(0, cursor[0] - 1)
+    cursor[1] = min(len(content[cursor[0]]) - 1, cursor[1])
+    return content, cursor
+
+
+def cursor_down(content, cursor):
+    cursor[0] = min(len(content) - 1, cursor[0] + 1)
+    cursor[1] = min(len(content[cursor[0]]) - 1, cursor[1])
+    return content, cursor
+
+
+def cursor_to_start(content, cursor):
+    cursor[1] = 0
+    return content, cursor
+
+
+def cursor_to_end(content, cursor):
+    cursor[1] = len(current_line) - 1
+    return content, cursor
+
+
+def delete(content, cursor):
+    global modified
+    modified = True
+    if cursor[1] == len(current_line) - 1:
+        if cursor[0] != len(content) - 1:
+            content = [*previous_content, inline_previous_content + content[cursor[0] + 1], *content[cursor[0] + 2:]]
+    else:
+        content = [*previous_content, inline_previous_content + inline_next_content, *next_content]
+    return content, cursor
+
+
+def my_exit(*args):
+    os.system('cls')
+    exit(0)
+
+
+def save(content, cursor):
+    global show_save_menu
+    if modified:
+        show_save_menu = True
+        return content, cursor
+    else:
+        my_exit()
+
+
+def handle_control_characters(content, cursor):
+
+    control_character_func_dict = {
+        b'K': cursor_left,
+        b'M': cursor_right,
+        b'H': cursor_up,
+        b'P': cursor_down,
+        b'G': cursor_to_start,
+        b'O': cursor_to_end,
+        b'S': delete,
+    }
+
+    key = getch()
+    if key in control_character_func_dict:
+        return control_character_func_dict[key](content, cursor)
+
+
+def handle_backspace(content, cursor):
+    global modified
+    modified = True
+    if cursor[1] == 0:
+        if cursor[0] != 0:
+            tmp = len(content[cursor[0] - 1]) - 1
+            content = [*content[:cursor[0] - 1], content[cursor[0] - 1][:-1] + current_line, *next_content]
+            cursor[0] = max(0, cursor[0] - 1)
+            cursor[1] = tmp
+    else:
+        content = [*previous_content, inline_previous_content[:-1] + current_char + inline_next_content, *next_content]
+        cursor[1] -= 1
+    return content, cursor
+
+
+def handle_enter(content, cursor):
+    global modified
+    modified = True
+    content = [*previous_content, inline_previous_content + '\n', current_char + inline_next_content, *next_content]
+    cursor[0] += 1
+    cursor[1] = 0
+    return content, cursor
+
+
+def handle_tabulator(content, cursor):
+    global modified
+    modified = True
+    content = [*previous_content, inline_previous_content + '\t' + current_char + inline_next_content, *next_content]
+    cursor[1] += 1
+    return content, cursor
+
+
+def handle_printable_character(content, cursor):
+    global modified
+    modified = True
+    content = [*previous_content, inline_previous_content + key.decode('utf-8') + current_char + inline_next_content, *next_content]
+    cursor[1] += 1
+    return content, cursor
+
+
+func_dict = {
+    b'\x03': my_exit,  # C-c
+    b'\x08': handle_backspace,  # backspace
+    b'\x09': handle_tabulator,  # tabulator
+    b'\x0d': handle_enter,  # enter
+    b'\x18': save,  # C-x
+    b'\xe0': handle_control_characters,
+    **{chr(c).encode(encoding): handle_printable_character
+       for c in range(32, 127)}  # printable characters
+}
+
 if __name__ == '__main__':
     if len(sys.argv) == 2:
         target_path = sys.argv[1]
@@ -193,13 +326,16 @@ if __name__ == '__main__':
                 exit(1)
             elif os.path.isfile(target_path):
                 with open(target_path, 'r') as f:
-                    content = f.readlines()
-                    # content = [line + '\n' for line in content]
+                    content = f.readlines() or ['']
+                    if content[-1][-1] == '\n':
+                        content.append('\x00')
+                    else:
+                        content[-1] += '\x00'
                     show_screen(content)
         else:
             if is_path_exists_or_creatable_portable(target_path):
                 open(target_path, 'w').close()  # TODO
-                content = ['']
+                content = ['\x00']
                 show_screen(content)
             else:
                 print('This path is invalid.')
@@ -216,69 +352,8 @@ if __name__ == '__main__':
         inline_previous_content = current_line[:cursor[1]]
         inline_next_content = current_line[cursor[1] + 1:]
         current_char = current_line[cursor[1]]
-        if key == b'\x03':  # C-c
-            my_exit()
-        elif key == b'\xe0':
-            key = getch()
 
-            if key == b'K':
-                if cursor[1] == 0:
-                    if cursor[0] != 0:
-                        cursor[0] = max(0, cursor[0] - 1)
-                        cursor[1] = len(content[cursor[0]]) - 1
-                else:
-                    cursor[1] -= 1
-            elif key == b'M':
-                if cursor[1] == len(current_line) - 1:
-                    if cursor[0] != len(content) - 1:
-                        cursor[0] = min(len(content) - 1, cursor[0] + 1)
-                        cursor[1] = 0
-                else:
-                    cursor[1] += 1
-            elif key == b'H':
-                cursor[0] = max(0, cursor[0] - 1)
-                cursor[1] = min(len(content[cursor[0]]) - 1, cursor[1])
-            elif key == b'P':
-                cursor[0] = min(len(content) - 1, cursor[0] + 1)
-                cursor[1] = min(len(content[cursor[0]]) - 1, cursor[1])
-            elif key == b'S':  # delete
-                modified = True
-                if cursor[1] == len(current_line) - 1:
-                    if cursor[0] != len(content) - 1:
-                        content = [*previous_content, inline_previous_content + content[cursor[0] + 1], *content[cursor[0] + 2:]]
-                else:
-                    content = [*previous_content, inline_previous_content + inline_next_content, *next_content]
-            elif key == b'G':  # home
-                cursor[1] = 0
-            elif key == b'O':  # end
-                cursor[1] = len(current_line) - 1
-        elif key == b'\x18':  # C-x save
-            if modified:
-                show_save_menu = True
-            else:
-                my_exit()
-        elif key == b'\x08':  # backspace
-            modified = True
-            if cursor[1] == 0:
-                if cursor[0] != 0:
-                    tmp = len(content[cursor[0] - 1]) - 1
-                    content = [*content[:cursor[0] - 1], content[cursor[0] - 1][:-1] + current_line, *next_content]
-                    cursor[0] = max(0, cursor[0] - 1)
-                    cursor[1] = tmp
-            else:
-                content = [*previous_content, inline_previous_content[:-1] + current_char + inline_next_content, *next_content]
-                cursor[1] -= 1
-        elif key == b'\r':  # enter
-            modified = True
-            content = [*previous_content, inline_previous_content + '\n', current_char + inline_next_content, *next_content]
-            cursor[0] += 1
-            cursor[1] = 0
-        elif key == b'\t':  # tabulator
-            modified = True
-            content = [*previous_content, inline_previous_content + '\t' + current_char + inline_next_content, *next_content]
-            cursor[1] += 1
-        elif 32 <= ord(key) <= 126:  # printable characters
-            modified = True
-            content = [*previous_content, inline_previous_content + key.decode('utf-8') + current_char + inline_next_content, *next_content]
-            cursor[1] += 1
+        if key in func_dict:
+            content, cursor = func_dict[key](content, cursor)
+
         show_screen(content)
