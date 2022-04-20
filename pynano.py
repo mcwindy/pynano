@@ -153,7 +153,6 @@ def show_screen(content):
                 print(' ' * tab_equivalent_length if char == '\t' else ' ' if char == '\x00' else char, end='')
     print('\n~' * (terminal_size.lines - len(content) - 6 - debug * (1 + len(content))))
 
-    # print(terminal_size.lines - len(content) - 2 * int(show_save_menu) - 4)
     if show_save_menu:
         print('Save change? (Y/N) | C-c to cancel')
         while True:
@@ -317,7 +316,8 @@ func_dict = {
        for c in range(32, 127)}  # printable characters
 }
 
-if __name__ == '__main__':
+
+def load_file():
     if len(sys.argv) == 2:
         target_path = sys.argv[1]
         if os.path.exists(target_path):
@@ -332,6 +332,7 @@ if __name__ == '__main__':
                     else:
                         content[-1] += '\x00'
                     show_screen(content)
+                return target_path, content
         else:
             if is_path_exists_or_creatable_portable(target_path):
                 open(target_path, 'w').close()  # TODO
@@ -343,6 +344,10 @@ if __name__ == '__main__':
     else:
         print('Usage: python3 pynano.py <file>')
         exit(1)
+
+
+if __name__ == '__main__':
+    target_path, content = load_file()
 
     while True:
         key = getch()
