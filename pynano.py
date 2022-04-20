@@ -303,18 +303,6 @@ def handle_printable_character(content, cursor):
     return content, cursor
 
 
-func_dict = {
-    b'\x03': my_exit,  # C-c
-    b'\x08': handle_backspace,  # backspace
-    b'\x09': handle_tabulator,  # tabulator
-    b'\x0d': handle_enter,  # enter
-    b'\x18': save,  # C-x
-    b'\xe0': handle_control_characters,
-    **{chr(c).encode(encoding): handle_printable_character
-       for c in range(32, 127)}  # printable characters
-}
-
-
 def load_file():
     if len(sys.argv) == 2:
         target_path = sys.argv[1]
@@ -343,6 +331,17 @@ def load_file():
         print('Usage: python3 pynano.py <file>')
         exit(1)
 
+
+func_dict = {
+    b'\x03': my_exit,  # C-c
+    b'\x08': handle_backspace,  # backspace
+    b'\x09': handle_tabulator,  # tabulator
+    b'\x0d': handle_enter,  # enter
+    b'\x18': save,  # C-x
+    b'\xe0': handle_control_characters,
+    **{chr(c).encode(encoding): handle_printable_character
+       for c in range(32, 127)}  # printable characters
+}
 
 if __name__ == '__main__':
     target_path, content = load_file()
