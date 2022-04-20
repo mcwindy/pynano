@@ -2,7 +2,7 @@ import os
 import sys
 from msvcrt import getch
 
-debug = True
+debug = False
 tab_equivalent_length = 4
 
 cursor = [0, 0]
@@ -12,7 +12,6 @@ terminal_size = os.get_terminal_size()
 encoding = 'utf-8'
 
 # snippets from stackoverflow, like fine art in the trash
-
 import errno
 import tempfile
 
@@ -163,7 +162,6 @@ def show_screen(content):
                 return
             elif key == b'Y' or key == b'y':
                 show_save_menu = False
-                # show_save_title = True
                 filename = get_filename()
                 save_file(filename, content)
                 my_exit()
