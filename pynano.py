@@ -237,6 +237,12 @@ def my_exit(*args):
     exit(0)
 
 
+def error_exit(statement):
+    # os.system('cls')
+    print(statement)
+    exit(1)
+
+
 def save(content, cursor):
     global show_save_menu
     if modified:
@@ -308,8 +314,8 @@ def load_file():
         target_path = sys.argv[1]
         if os.path.exists(target_path):
             if os.path.isdir(target_path):
-                print('This is a directory, not a file. Exiting.')
-                exit(1)
+                # TODO choose file
+                error_exit('This is a directory, not a file. Exiting.')
             elif os.path.isfile(target_path):
                 with open(target_path, 'r') as f:
                     content = f.readlines() or ['']
@@ -325,11 +331,9 @@ def load_file():
                 content = ['\x00']
                 show_screen(content)
             else:
-                print('This path is invalid.')
-                exit(1)
+                error_exit('This path is invalid.')
     else:
-        print('Usage: python3 pynano.py <file>')
-        exit(1)
+        error_exit('Usage: python3 pynano.py <file>')
 
 
 func_dict = {
@@ -343,6 +347,7 @@ func_dict = {
        for c in range(32, 127)}  # printable characters
 }
 
+# TODO copy paste cut shift-select undo
 if __name__ == '__main__':
     target_path, content = load_file()
 
